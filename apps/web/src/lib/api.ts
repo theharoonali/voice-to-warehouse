@@ -1,6 +1,8 @@
 import {
   apiErrorSchema,
   greetingResponseSchema,
+  structuredOutputResponseSchema,
+  type StructuredOutput,
   type Greeting,
   type GreetingQuery,
 } from '@repo/contracts';
@@ -9,6 +11,31 @@ const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(
   /\/+$/,
   '',
 );
+
+export async function fetchStructuredOutput(
+  text: string,
+  signal: AbortSignal,
+): Promise<StructuredOutput> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/structured-output`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(35_000)]),
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const parsed = apiErrorSchema.safeParse(body);
+    throw new Error(
+      parsed.success
+        ? (parsed.data.error.details?.[0]?.message ?? parsed.data.error.message)
+        : 'Could not generate JSON. Please try again.',
+    );
+  }
+  const parsed = structuredOutputResponseSchema.safeParse(body);
+  if (!parsed.success)
+    throw new Error('The API returned an object with an unexpected format.');
+  return parsed.data.data;
+}
 
 export async function fetchTranscriptionToken(
   signal: AbortSignal,

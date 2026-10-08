@@ -12,3 +12,13 @@ export {
   greetingResponseSchema,
 } from './greeting.js';
 export type { Greeting, GreetingQuery, GreetingResponse } from './greeting.js';
+export {
+  structuredOutputRequestSchema,
+  structuredOutputSchema,
+  structuredOutputResponseSchema,
+} from './structured-output.js';
+export type {
+  StructuredOutputRequest,
+  StructuredOutput,
+  StructuredOutputResponse,
+} from './structured-output.js';

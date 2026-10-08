@@ -7,6 +7,12 @@ const envSchema = z.object({
     .default('development'),
   HOST: z.string().min(1).default('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+  ANTHROPIC_API_KEY: z
+    .string()
+    .trim()
+    .transform((value) => value || undefined)
+    .optional(),
+  ANTHROPIC_MODEL: z.string().trim().min(1).default('claude-sonnet-5-5'),
   ELEVENLABS_API_KEY: z
     .string()
     .trim()

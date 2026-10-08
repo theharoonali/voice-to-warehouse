@@ -12,6 +12,25 @@ export const errorHandler: ErrorRequestHandler<
     return;
   }
 
+  if (
+    error &&
+    typeof error === 'object' &&
+    'type' in error &&
+    (error.type === 'entity.parse.failed' || error.type === 'entity.too.large')
+  ) {
+    const tooLarge = error.type === 'entity.too.large';
+    res.status(tooLarge ? 413 : 400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: tooLarge
+          ? 'The request body is too large.'
+          : 'The request body must be valid JSON.',
+      },
+    });
+    return;
+  }
+
   if (error instanceof ZodError) {
     res.status(400).json({
       success: false,

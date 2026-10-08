@@ -9,10 +9,12 @@
     "start": "node --enable-source-maps dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
-    "test": "node --import tsx --test src/routes/transcription.routes.test.ts"
+    "test": "node --import tsx --test src/routes/*.test.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.77",
     "@repo/contracts": "*",
+    "ai": "^7.0.134",
     "dotenv": "^18.0.6",
     "express": "^5.2.1",
     "helmet": "^8.3.0",

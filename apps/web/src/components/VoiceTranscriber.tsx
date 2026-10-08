@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranscription, type Language } from '../hooks/use-transcription';
+import { StructuredOutputCard } from './StructuredOutputCard';
 
 export function VoiceTranscriber() {
   const [language, setLanguage] = useState<Language>('en');
@@ -188,6 +189,10 @@ export function VoiceTranscriber() {
           starts a fresh transcript.
         </footer>
       </section>
+      <StructuredOutputCard
+        transcript={[...segments, partial].filter(Boolean).join(' ')}
+        recording={active}
+      />
       <footer className="page-footer">
         Powered by ElevenLabs <span>/</span> English &amp; German
       </footer>
