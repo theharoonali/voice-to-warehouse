@@ -3,14 +3,15 @@
   "private": true,
   "packageManager": "npm@11.17.0",
   "engines": {
-    "node": ">=24 <25",
-    "npm": ">=11 <12"
+    "node": ">=24",
+    "npm": ">=11"
   },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "npm run build --workspace=@repo/contracts",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "npm run start --workspace=@repo/api",
@@ -30,5 +31,8 @@
     "turbo": "^2.11.7",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.1"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }
