@@ -15,7 +15,8 @@ body {
   min-width: 320px;
 }
 button,
-input {
+input,
+select {
   font: inherit;
 }
 .shell {
@@ -112,9 +113,231 @@ button:disabled {
   cursor: wait;
 }
 input:focus-visible,
+select:focus-visible,
+.transcript-text:focus-visible,
 button:focus-visible {
   outline: 3px solid #81a974;
   outline-offset: 3px;
+}
+
+.brand-tag {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  color: #657361;
+}
+.voice-card {
+  padding: 42px 48px 30px;
+  background: #fffefa;
+  border: 1px solid #dce1d6;
+  border-radius: 24px;
+  box-shadow: 0 16px 48px #142e2807;
+}
+.card-heading,
+.language-row,
+.transcript-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.card-heading {
+  margin-bottom: 28px;
+}
+.card-heading .eyebrow {
+  margin: 0;
+}
+.service-badge {
+  background: #edf3e7;
+  color: #426437;
+  border-radius: 20px;
+  padding: 7px 11px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.language-row label {
+  margin: 0;
+}
+select {
+  padding: 10px 36px 10px 12px;
+  border: 1px solid #cbd3c8;
+  border-radius: 9px;
+  background: #fffefa;
+  color: #203e32;
+  font-size: 13px;
+}
+select:disabled {
+  opacity: 0.65;
+}
+.field-hint {
+  color: #657361;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 10px 0 0;
+}
+.voice-stage {
+  text-align: center;
+  margin-top: 26px;
+  border: 1px solid #e3e8db;
+  border-radius: 18px;
+  padding: 32px 24px 0;
+  background: radial-gradient(
+    ellipse at 50% 30%,
+    #eaf1df 0%,
+    #f6f8ef 55%,
+    #f8f9f3 100%
+  );
+  overflow: hidden;
+}
+.voice-rings {
+  display: grid;
+  place-items: center;
+  width: 136px;
+  height: 136px;
+  margin: auto;
+  border: 1px solid #dae5cf;
+  border-radius: 50%;
+  background: #e7efdd70;
+}
+.mic-button {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  box-shadow: 0 6px 18px #203e3220;
+  transition:
+    background 160ms,
+    transform 160ms;
+}
+.mic-button:hover:not(:disabled) {
+  transform: scale(1.04);
+}
+.mic-button svg {
+  width: 31px;
+  height: 31px;
+}
+.voice-stage--listening .voice-rings {
+  animation: listening-pulse 2s ease-in-out infinite;
+}
+.mic-label {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 18px 0 8px;
+}
+.recording-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #637169;
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #97a38d;
+}
+.status-dot--live {
+  background: #3c833d;
+}
+.subtitle {
+  margin: 25px -24px 0;
+  padding: 17px 26px;
+  border-top: 1px solid #e0e7d6;
+  background: #ffffff80;
+  min-height: 58px;
+  max-height: 150px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #42553b;
+}
+.transcript-panel {
+  margin-top: 26px;
+}
+.transcript-heading h2 {
+  margin: 0;
+  font-size: 13px;
+}
+.clear-button {
+  background: transparent;
+  color: #637169;
+  border: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.clear-button:hover:not(:disabled) {
+  background: #edf3e7;
+}
+.clear-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.transcript-text {
+  max-height: 220px;
+  min-height: 92px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  padding-top: 4px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.empty-transcript,
+.interim-text {
+  color: #75806e;
+}
+.transcription-error {
+  padding: 14px 16px;
+  border: 1px solid #e4bbb0;
+  border-radius: 10px;
+  color: #852f23;
+  background: #fff2ef;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.voice-card .card-footer {
+  border-top: 1px solid #e5e8df;
+  padding-top: 18px;
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.7;
+}
+@keyframes listening-pulse {
+  50% {
+    box-shadow: 0 0 0 10px #dae5cf60;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-stage--listening .voice-rings {
+    animation: none;
+  }
+  .mic-button {
+    transition: none;
+  }
+}
+@media (max-width: 600px) {
+  .voice-card {
+    padding: 28px 20px 22px;
+  }
+  .brand-tag {
+    display: none;
+  }
+  .card-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .language-row {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .voice-stage {
+    padding-top: 24px;
+  }
 }
 .response {
   margin-top: 26px;
