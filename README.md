@@ -16,7 +16,8 @@ transcript; stopping retains the current text. Lighter text is an interim result
 2. Copy `apps/api/.env.example` to `apps/api/.env` and set
    `ELEVENLABS_API_KEY` to an ElevenLabs key with realtime speech-to-text access.
    Keep this key on the server; never use a `VITE_` environment variable for it.
-3. Run `npm run dev` and open <http://127.0.0.1:5173>.
+3. Run `npm run dev` and open <http://127.0.0.1:3000>. The backend runs on
+   <http://127.0.0.1:3001>.
 
 The frontend requests a single-use token from
 `POST /api/v1/transcription/token` and connects directly to ElevenLabs. The API
