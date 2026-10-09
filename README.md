@@ -5,7 +5,11 @@ Innovation Challenge Project
 ## Live voice transcription
 
 The React frontend streams microphone audio to ElevenLabs Scribe v2 Realtime.
-Choose English or German, press the microphone, and allow microphone access.
+Choose English or German, press the microphone (or the space bar, unless a
+text field has focus), and allow microphone access. Say “Done” or “Fertig” as
+the last word: the recording stops, the word is removed from the transcript,
+and the goods receipt JSON is created automatically. Space also stops a
+recording by hand, which only fills the text field.
 Live subtitles appear below the microphone, with the full transcript underneath.
 Stop recording before changing language. Each new recording starts a fresh
 transcript; stopping retains the current text. Lighter text is an interim result.
@@ -81,3 +85,121 @@ Validation: `npm run test --workspace=@repo/api` and
 `npm run test --workspace=@repo/web`. The Claude tests mock Anthropic's HTTP
 response while exercising the actual SDK, provider adapter, and schema validation;
 they require no paid API calls.
+
+## Goods receipt (Wareneingang) JSON
+
+The app's second card turns a voice transcript (or typed text) into the goods
+receipt JSON that the Byte ERP expects.
+
+Flow: when the page loads, the app calls `GET /api/v1/goods-receipt/order`
+once. The API reads purchase order `ERP_BESTELLNUMMER` from the ERP export
+service (`POST {ERP_BASE_URL}/web/services/EXP020` with Basic auth) and returns
+a summary of its positions. The app shows that summary and sends it back with
+every `POST /api/v1/goods-receipt` request, so the ERP is not read again for
+each conversion. The API gives Claude only the relevant position data (position
+number, article numbers, name, ordered, booked, remaining) and the text; Claude
+decides which position each spoken article belongs to and extracts quantity,
+bin, batch, and expiry. Position numbers, article numbers, and prices always
+come from the ERP data. A finished recording fills the text field
+automatically; nothing is sent until **Create goods receipt JSON** is selected.
+
+Set these in `apps/api/.env` (see `.env.example`): `ERP_BASE_URL`,
+`ERP_USERNAME`, `ERP_PASSWORD`, `ERP_FIRMA` (default `01`), `ERP_BESTELLNUMMER`
+(default `1712`), and `ERP_ALLOW_SELF_SIGNED=true` for the challenge host,
+whose certificate is self-signed.
+
+Request body (`Content-Type: application/json`). `order` is the object from
+`GET /api/v1/goods-receipt/order`; without it the API reads the ERP itself.
+`artikelnummerhersteller` is optional and limits matching to positions with
+one of these manufacturer article numbers:
+
+```json
+{
+  "text": "One pack of Ibuflam 600mg in bin M53-01-01-02, batch AB1234, expiry December 2027. Two Samsung RAM modules in bin M53-02-01-01, batch HS77.",
+  "order": { "Firma": "01", "Bestellnummer": 1712, "positionen": ["…"] },
+  "artikelnummerhersteller": ["55204", "55207"]
+}
+```
+
+Articles can be named by name (English or German) or by article number. Each
+article needs a quantity, bin (`Lagerort`), and batch (`Charge`). The expiry
+date (`Verfalldatum`) is optional: when it is not said, `122026` is used and the
+item carries `expiryDefaulted: true`, which the card shows as
+"(default, not said)". Two batches of the same article produce one position
+with two `VCS` entries and the summed `Zubuchmenge`.
+
+The ERP books **one position per call**, so the response contains one goods
+receipt per position in `bestellungen`, each with its own random
+`Lieferanten_Rechnungsnummer`; both dates are fixed to `31.12.2026`. Every
+`VCS` line also carries a random six-digit `Seriennummer`. Post each
+entry to the ERP wrapped as `{ "bestellung": … }` (the card shows and copies
+them in exactly that form). Sending the inner object without the wrapper makes
+the ERP answer RTC001 (Firma missing), RTC002 (Bestellnummer missing), and
+RTC004 (Rechnungsnummer missing).
+
+```json
+{
+  "success": true,
+  "data": {
+    "complete": true,
+    "items": [
+      {
+        "spoken": "pack of Ibuflam 600mg",
+        "Positionnummer": 2,
+        "Artikelnummer": "55204",
+        "Artikelbezeichnung": "Ibuflam 600mg",
+        "Zubuchmenge": 1,
+        "Lagerort": "M53-01-01-02",
+        "Charge": "AB1234",
+        "Verfalldatum": "122027",
+        "expiryDefaulted": false,
+        "missing": []
+      }
+    ],
+    "messages": [],
+    "bestellungen": [
+      {
+        "Firma": "01",
+        "Bestellnummer": 1712,
+        "Lieferanten_Rechnungsnummer": "0815",
+        "Lieferanten_Rechnungsdatum": "31.12.2026",
+        "Wareneingangsdatum": "31.12.2026",
+        "positionen": [
+          {
+            "Positionnummer": 2,
+            "Artikelnummer": "55204",
+            "Lagerort": "M53-01-01-02",
+            "Einkaufpreis": 2.34,
+            "Zubuchmenge": 1,
+            "VCS": [
+              {
+                "Verfalldatum": "122027",
+                "Charge": "AB1234",
+                "Seriennummer": "112233",
+                "Menge": 1
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`items` is the per-article review the card shows: article, quantity, bin, and
+batch, with a cross for every detail the user did not say. When any article is
+incomplete or does not belong to the order, `complete` is `false`,
+`bestellungen` is empty (no JSON is produced), and `messages` explains each
+gap, for example `Ibuflam 600mg (position 2): bin (Lagerort) and batch (Charge)
+not said.` or `"a pack of tissues" is not part of order 1712.`
+
+`GET /api/v1/goods-receipt/order` returns the order summary. Each position
+carries `Bestellmenge` (ordered), `Bereitszugebuchtemenge` (already booked),
+and `Restmenge`, the remaining quantity computed as ordered minus booked (never
+below 0); the card shows all three, and fully booked positions are greyed out.
+
+Errors: 400 invalid input, 404 order or filtered positions not found, 503 ERP
+or Claude not configured, 502 ERP or Claude failure (no upstream details are
+forwarded), 504 timeout. Tests: `npm run test --workspace=@repo/api` mocks
+both the ERP and Anthropic over HTTP.

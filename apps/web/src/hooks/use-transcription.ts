@@ -2,6 +2,39 @@ import { useEffect, useRef, useState } from 'react';
 import type { RealtimeConnection } from '@elevenlabs/client';
 import { fetchTranscriptionToken } from '../lib/api';
 
+const RELOAD_FLAG = 'elevenlabs-client-reloaded';
+
+// The ElevenLabs client is loaded on first use. When the dev server has
+// re-bundled its dependencies since this page was opened, the page still holds
+// the old module URL and the import fails with "Failed to fetch dynamically
+// imported module". Reloading once fetches the current bundle; a second
+// failure is reported instead of looping.
+async function loadElevenLabs() {
+  try {
+    const client = await import('@elevenlabs/client');
+    sessionStorage.removeItem(RELOAD_FLAG);
+    return client;
+  } catch (error) {
+    const stale =
+      error instanceof TypeError &&
+      /dynamically imported module|Importing a module script failed/i.test(
+        error.message,
+      );
+    if (stale && !sessionStorage.getItem(RELOAD_FLAG)) {
+      sessionStorage.setItem(RELOAD_FLAG, '1');
+      window.location.reload();
+      // Keep the caller waiting while the page reloads.
+      await new Promise<never>(() => {});
+    }
+    throw new Error(
+      stale
+        ? 'The app was updated. Reload the page, then start the recording again.'
+        : 'Could not load the transcription client. Reload the page and try again.',
+      { cause: error },
+    );
+  }
+}
+
 export type Language = 'en' | 'de';
 type Status = 'idle' | 'connecting' | 'listening' | 'stopping';
 type Session = {
@@ -66,7 +99,7 @@ export function useTranscription(language: Language) {
     try {
       const [{ Scribe, RealtimeEvents, CommitStrategy }, token] =
         await Promise.all([
-          import('@elevenlabs/client'),
+          loadElevenLabs(),
           fetchTranscriptionToken(current.controller.signal),
         ]);
       if (session.current !== current) return;

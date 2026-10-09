@@ -12,6 +12,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // Pre-bundle the lazily imported ElevenLabs client at startup. Otherwise Vite
+    // discovers it on first use, re-bundles, and an open page can be left with a
+    // stale module URL ("Failed to fetch dynamically imported module").
+    optimizeDeps: { include: ['@elevenlabs/client'] },
     server: { host: '127.0.0.1', port: 3000, strictPort: true, proxy },
     preview: { host: '127.0.0.1', port: 3000, strictPort: true, proxy },
   };

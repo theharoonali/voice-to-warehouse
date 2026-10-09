@@ -1,7 +1,11 @@
 import {
   apiErrorSchema,
+  goodsReceiptOrderResponseSchema,
+  goodsReceiptResponseSchema,
   greetingResponseSchema,
   structuredOutputResponseSchema,
+  type GoodsReceipt,
+  type GoodsReceiptOrder,
   type StructuredOutput,
   type Greeting,
   type GreetingQuery,
@@ -11,6 +15,62 @@ const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(
   /\/+$/,
   '',
 );
+
+function errorMessage(body: unknown, fallback: string): string {
+  const parsed = apiErrorSchema.safeParse(body);
+  return parsed.success
+    ? (parsed.data.error.details?.[0]?.message ?? parsed.data.error.message)
+    : fallback;
+}
+
+// Sends the text with the order the app already loaded, so the API does not
+// have to read the ERP again. Without an order the API loads it itself.
+export async function fetchGoodsReceipt(
+  text: string,
+  order: GoodsReceiptOrder | null,
+  signal: AbortSignal,
+): Promise<GoodsReceipt> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/goods-receipt`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(order ? { text, order } : { text }),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(70_000)]),
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      errorMessage(
+        body,
+        'Could not create the goods receipt. Please try again.',
+      ),
+    );
+  }
+  const parsed = goodsReceiptResponseSchema.safeParse(body);
+  if (!parsed.success)
+    throw new Error(
+      'The API returned a goods receipt with an unexpected format.',
+    );
+  return parsed.data.data;
+}
+
+export async function fetchGoodsReceiptOrder(
+  signal: AbortSignal,
+): Promise<GoodsReceiptOrder> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/goods-receipt/order`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.any([signal, AbortSignal.timeout(20_000)]),
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      errorMessage(body, 'Could not load the purchase order from the ERP.'),
+    );
+  }
+  const parsed = goodsReceiptOrderResponseSchema.safeParse(body);
+  if (!parsed.success)
+    throw new Error('The API returned an order with an unexpected format.');
+  return parsed.data.data;
+}
 
 export async function fetchStructuredOutput(
   text: string,
@@ -24,11 +84,8 @@ export async function fetchStructuredOutput(
   });
   const body: unknown = await response.json();
   if (!response.ok) {
-    const parsed = apiErrorSchema.safeParse(body);
     throw new Error(
-      parsed.success
-        ? (parsed.data.error.details?.[0]?.message ?? parsed.data.error.message)
-        : 'Could not generate JSON. Please try again.',
+      errorMessage(body, 'Could not generate JSON. Please try again.'),
     );
   }
   const parsed = structuredOutputResponseSchema.safeParse(body);
@@ -83,11 +140,11 @@ export async function fetchGreeting(
   const body: unknown = await response.json();
 
   if (!response.ok) {
-    const parsed = apiErrorSchema.safeParse(body);
     throw new Error(
-      parsed.success
-        ? (parsed.data.error.details?.[0]?.message ?? parsed.data.error.message)
-        : `Request failed (${response.status}). Please try again.`,
+      errorMessage(
+        body,
+        `Request failed (${response.status}). Please try again.`,
+      ),
     );
   }
 

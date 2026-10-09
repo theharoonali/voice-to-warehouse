@@ -1,25 +1,79 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranscription, type Language } from '../hooks/use-transcription';
-import { StructuredOutputCard } from './StructuredOutputCard';
+import { endsWithDone, stripDoneWord } from '../lib/voice-commands';
+import {
+  GoodsReceiptCard,
+  type GoodsReceiptCardHandle,
+} from './GoodsReceiptCard';
 
 export function VoiceTranscriber() {
   const [language, setLanguage] = useState<Language>('en');
   const { status, error, segments, partial, start, stop, clear } =
     useTranscription(language);
   const transcript = useRef<HTMLDivElement>(null);
+  const card = useRef<GoodsReceiptCardHandle>(null);
+  // Set when the worker said "Done": create the JSON once the recording ends.
+  const createOnIdle = useRef(false);
   const active = status !== 'idle';
   const hasText = segments.length > 0 || Boolean(partial);
+  const transcriptText = [...segments, partial].filter(Boolean).join(' ');
 
   useEffect(() => {
     if (transcript.current)
       transcript.current.scrollTop = transcript.current.scrollHeight;
   }, [segments, partial]);
 
+  // The space bar starts a recording (and stops one), unless the user is
+  // typing in a field.
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (
+        event.code !== 'Space' ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+      )
+        return;
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest(
+          'input, textarea, select, [contenteditable="true"]',
+        )
+      )
+        return;
+      event.preventDefault();
+      if (status === 'idle') void start();
+      else if (status === 'listening') stop();
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [status, start, stop]);
+
+  // Saying "Done" (or "Fertig") at the end stops the recording. Only committed
+  // words count, so a half-heard word cannot end it.
+  useEffect(() => {
+    if (status !== 'listening') return;
+    const last = segments.at(-1);
+    if (last && endsWithDone(last)) {
+      createOnIdle.current = true;
+      stop();
+    }
+  }, [segments, status, stop]);
+
+  // Once the recording has ended after "Done", create the JSON automatically.
+  useEffect(() => {
+    if (status !== 'idle' || !createOnIdle.current) return;
+    createOnIdle.current = false;
+    const text = stripDoneWord(transcriptText);
+    if (text) card.current?.create(text);
+  }, [status, transcriptText]);
+
   const statusText =
     status === 'connecting'
       ? 'Connecting · allow microphone access'
       : status === 'listening'
-        ? 'Listening · speak naturally'
+        ? 'Listening · say “Done” when you have finished'
         : status === 'stopping'
           ? 'Finishing your last words…'
           : hasText
@@ -46,8 +100,9 @@ export function VoiceTranscriber() {
           In words<span>.</span>
         </h1>
         <p className="intro">
-          Speak naturally and watch your words appear. Capture every detail, one
-          sentence at a time.
+          Press Space or tap the microphone, say what arrived, and finish with
+          “Done”. The recording stops and the goods receipt JSON is created for
+          you.
         </p>
 
         <div className="language-row">
@@ -111,10 +166,10 @@ export function VoiceTranscriber() {
               : status === 'stopping'
                 ? 'Finishing recording'
                 : active
-                  ? 'Tap to stop'
+                  ? 'Say “Done” to finish · tap or press Space to stop'
                   : hasText
-                    ? 'Start a new recording'
-                    : 'Tap to start speaking'}
+                    ? 'Press Space or tap for a new recording'
+                    : 'Press Space or tap to start speaking'}
           </p>
           <p className="recording-status" role="status">
             <span
@@ -185,16 +240,18 @@ export function VoiceTranscriber() {
           )}
         </section>
         <footer className="card-footer">
-          Audio is streamed to ElevenLabs while recording. A new recording
-          starts a fresh transcript.
+          Audio is streamed to ElevenLabs while recording. Press Space to start;
+          say “Done” to stop and create the JSON. A new recording starts a fresh
+          transcript.
         </footer>
       </section>
-      <StructuredOutputCard
-        transcript={[...segments, partial].filter(Boolean).join(' ')}
+      <GoodsReceiptCard
+        ref={card}
+        transcript={stripDoneWord(transcriptText)}
         recording={active}
       />
       <footer className="page-footer">
-        Powered by ElevenLabs <span>/</span> English &amp; German
+        Powered by ElevenLabs <span>/</span> Claude <span>/</span> Byte ERP
       </footer>
     </main>
   );

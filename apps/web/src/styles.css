@@ -471,3 +471,131 @@ select:disabled {
     padding: 20px;
   }
 }
+
+/* Goods receipt (Wareneingang) card */
+.order-panel {
+  margin: 0 0 22px;
+  padding: 16px 18px;
+  border: 1px solid #e3e8db;
+  border-radius: 12px;
+  background: #f8f9f3;
+}
+.order-panel h3,
+.json-result .transcript-heading h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.order-panel .field-hint {
+  margin: 0;
+}
+.order-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.order-table th,
+.order-table td {
+  text-align: left;
+  padding: 7px 8px;
+  border-bottom: 1px solid #e5e8df;
+  vertical-align: top;
+}
+.order-table th {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  font-weight: 700;
+  color: #5d7554;
+}
+.order-table tr:last-child td {
+  border-bottom: 0;
+}
+.order-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.missing-box {
+  margin-top: 22px;
+  padding: 14px 16px;
+  border: 1px solid #e6cf9a;
+  border-radius: 10px;
+  background: #fff8e8;
+  color: #6b4f0b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.missing-box ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+.complete-note {
+  margin: 22px 0 0;
+  padding: 12px 16px;
+  border: 1px solid #c9dcc0;
+  border-radius: 10px;
+  background: #edf3e7;
+  color: #2f5a28;
+  font-size: 13px;
+}
+@media (max-width: 560px) {
+  .order-table .artnr {
+    display: none;
+  }
+}
+.order-table .remaining {
+  font-weight: 700;
+  color: #2f5a28;
+}
+.order-row--done td {
+  color: #8a948a;
+}
+.order-row--done .remaining {
+  font-weight: 400;
+  color: #8a948a;
+  font-style: italic;
+}
+.order-panel {
+  overflow-x: auto;
+}
+.order-table th {
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  /* Keep the remaining quantity visible on phones; drop ordered and booked. */
+  .order-table .qty {
+    display: none;
+  }
+}
+/* Review of recognised articles */
+.review {
+  margin-top: 22px;
+}
+.review h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.review-table td {
+  vertical-align: top;
+}
+.cell-sub {
+  display: block;
+  font-size: 11px;
+  color: #657361;
+  margin-top: 2px;
+}
+.cross {
+  color: #a3261a;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.missing-box p {
+  margin: 10px 0 0;
+}
+.json-block {
+  margin-top: 16px;
+}
+.json-block h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}

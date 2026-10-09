@@ -22,3 +22,29 @@ export type {
   StructuredOutput,
   StructuredOutputResponse,
 } from './structured-output.js';
+export {
+  goodsReceiptRequestSchema,
+  vcsEntrySchema,
+  wareneingangPositionSchema,
+  wareneingangSchema,
+  goodsReceiptRequiredFieldSchema,
+  goodsReceiptItemSchema,
+  goodsReceiptSchema,
+  goodsReceiptResponseSchema,
+  goodsReceiptOrderPositionSchema,
+  goodsReceiptOrderSchema,
+  goodsReceiptOrderResponseSchema,
+} from './goods-receipt.js';
+export type {
+  GoodsReceiptRequest,
+  VcsEntry,
+  WareneingangPosition,
+  Wareneingang,
+  GoodsReceiptRequiredField,
+  GoodsReceiptItem,
+  GoodsReceipt,
+  GoodsReceiptResponse,
+  GoodsReceiptOrderPosition,
+  GoodsReceiptOrder,
+  GoodsReceiptOrderResponse,
+} from './goods-receipt.js';
