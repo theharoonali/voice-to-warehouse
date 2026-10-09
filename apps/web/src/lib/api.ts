@@ -1,11 +1,14 @@
 import {
   apiErrorSchema,
+  goodsReceiptBookResponseSchema,
   goodsReceiptOrderResponseSchema,
   goodsReceiptResponseSchema,
   greetingResponseSchema,
   structuredOutputResponseSchema,
   type GoodsReceipt,
+  type GoodsReceiptBooking,
   type GoodsReceiptOrder,
+  type Wareneingang,
   type StructuredOutput,
   type Greeting,
   type GreetingQuery,
@@ -152,5 +155,31 @@ export async function fetchGreeting(
   if (!parsed.success)
     throw new Error('The API returned an unexpected response.');
 
+  return parsed.data.data;
+}
+
+// Books the receipts through the API, which holds the ERP credentials and
+// accepts its self-signed certificate. The ERP does not allow browser calls.
+export async function fetchGoodsReceiptBooking(
+  bestellungen: Wareneingang[],
+  signal: AbortSignal,
+): Promise<GoodsReceiptBooking> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/goods-receipt/book`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bestellungen }),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      errorMessage(body, 'Could not book the goods receipt. Please try again.'),
+    );
+  }
+  const parsed = goodsReceiptBookResponseSchema.safeParse(body);
+  if (!parsed.success)
+    throw new Error(
+      'The API returned a booking result with an unexpected format.',
+    );
   return parsed.data.data;
 }

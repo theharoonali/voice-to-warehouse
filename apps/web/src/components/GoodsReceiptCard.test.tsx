@@ -18,6 +18,7 @@ import {
 
 vi.mock('../lib/api', () => ({
   fetchGoodsReceipt: vi.fn(),
+  fetchGoodsReceiptBooking: vi.fn(),
   fetchGoodsReceiptOrder: vi.fn(),
 }));
 
@@ -199,7 +200,6 @@ it('sends the text with the loaded order and shows the JSON when complete', asyn
   expect(screen.queryByLabelText(/^Missing:/)).toBeNull();
   const blocks = screen.getAllByLabelText(/^Generated JSON/);
   expect(blocks).toHaveLength(1);
-  expect(screen.getByText(/Booking 1 of 1 · Position 2 · 55204/)).toBeTruthy();
   const output = blocks[0]?.textContent;
   expect(output).toContain('"Positionnummer": 2');
   expect(output).toContain('"Zubuchmenge": 1');

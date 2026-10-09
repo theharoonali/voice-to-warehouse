@@ -48,3 +48,17 @@ export type {
   GoodsReceiptOrder,
   GoodsReceiptOrderResponse,
 } from './goods-receipt.js';
+export {
+  erpReturnSchema,
+  goodsReceiptBookRequestSchema,
+  goodsReceiptBookingResultSchema,
+  goodsReceiptBookingSchema,
+  goodsReceiptBookResponseSchema,
+} from './goods-receipt.js';
+export type {
+  ErpReturn,
+  GoodsReceiptBookRequest,
+  GoodsReceiptBookingResult,
+  GoodsReceiptBooking,
+  GoodsReceiptBookResponse,
+} from './goods-receipt.js';

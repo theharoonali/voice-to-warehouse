@@ -203,3 +203,38 @@ Errors: 400 invalid input, 404 order or filtered positions not found, 503 ERP
 or Claude not configured, 502 ERP or Claude failure (no upstream details are
 forwarded), 504 timeout. Tests: `npm run test --workspace=@repo/api` mocks
 both the ERP and Anthropic over HTTP.
+
+### Confirm and book in the ERP
+
+When the JSON is complete, the card shows the bookings as a table (position,
+article, bin, quantity, batch, expiry, serial, price, invoice number) with the
+raw JSON available per booking under "JSON for booking n". **Confirm and book
+in ERP** sends them to `POST /api/v1/goods-receipt/book`
+(`{ "bestellungen": [ ... ] }`). The API books each entry with
+`PUT {ERP_BASE_URL}/web/services/IMP015` and the body `{ "bestellung": ... }`,
+using the same Basic auth as the order export, one call per position, in
+order. The browser cannot call the ERP itself: its preflight request is
+answered with 401 and no CORS headers, the certificate is self-signed, and the
+credentials must stay on the server.
+
+The ERP answers every booking with HTTP 200 and a list of return codes, for
+example RTC001 (`Firma` missing), RTC007 (`Wareneingangsdatum` missing), RTC041
+(`Menge` invalid) or RTC100 (booking not accepted). Because the codes do not
+say what was booked, the API reads the order before and after and marks a
+position as `booked` only when the ERP did not answer RTC100 and the position's
+`Bereitszugebuchtemenge` increased by the booked quantity. The response
+contains one result per position (`booked`, `bookedBefore`, `bookedAfter`,
+the ERP `return` codes, the invoice number), `allBooked`, and the order as
+read after booking; the card shows the results, updates the open positions
+table, disables the button once everything is booked, and offers a retry for
+rejected positions only. Only `ERP_BESTELLNUMMER` of `ERP_FIRMA` can be booked;
+other orders are rejected with 400.
+
+If a booking call itself fails (network error, HTTP error, or an unexpected
+answer), the API records it for that position with the return code `API` and
+a message, continues with the remaining positions, and still reads the order
+again, so a receipt whose answer was lost is reported as booked when the
+quantity increased. Order reads are repeated once after a network error;
+booking calls never are. The API opens a fresh connection to the ERP for every
+call, because the ERP closes idle connections, and logs the cause of every
+failed ERP call (without credentials) to the server console.

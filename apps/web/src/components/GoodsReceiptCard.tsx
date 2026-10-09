@@ -9,10 +9,16 @@ import {
 import {
   goodsReceiptRequestSchema,
   type GoodsReceipt,
+  type GoodsReceiptBooking,
   type GoodsReceiptItem,
   type GoodsReceiptOrder,
+  type Wareneingang,
 } from '@repo/contracts';
-import { fetchGoodsReceipt, fetchGoodsReceiptOrder } from '../lib/api';
+import {
+  fetchGoodsReceipt,
+  fetchGoodsReceiptBooking,
+  fetchGoodsReceiptOrder,
+} from '../lib/api';
 
 type Result =
   | { status: 'idle' }
@@ -23,6 +29,12 @@ type Result =
 type OrderState =
   | { status: 'loading' }
   | { status: 'success'; order: GoodsReceiptOrder }
+  | { status: 'error'; message: string };
+
+type Booking =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: GoodsReceiptBooking }
   | { status: 'error'; message: string };
 
 const EXAMPLE_TEXT =
@@ -72,9 +84,11 @@ export function GoodsReceiptCard({
   const [text, setText] = useState('');
   const [result, setResult] = useState<Result>({ status: 'idle' });
   const [order, setOrder] = useState<OrderState>({ status: 'loading' });
+  const [booking, setBooking] = useState<Booking>({ status: 'idle' });
   const [copied, setCopied] = useState<number | null>(null);
   const [wasRecording, setWasRecording] = useState(recording);
   const request = useRef<AbortController | null>(null);
+  const bookingRequest = useRef<AbortController | null>(null);
   const loading = result.status === 'loading';
 
   // When a recording finishes, its transcript becomes the text to convert.
@@ -107,7 +121,13 @@ export function GoodsReceiptCard({
       });
     return () => controller.abort();
   }, []);
-  useEffect(() => () => request.current?.abort(), []);
+  useEffect(
+    () => () => {
+      request.current?.abort();
+      bookingRequest.current?.abort();
+    },
+    [],
+  );
 
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -127,6 +147,7 @@ export function GoodsReceiptCard({
     const controller = new AbortController();
     request.current = controller;
     setResult({ status: 'loading' });
+    setBooking({ status: 'idle' });
     setCopied(null);
     try {
       const data = await fetchGoodsReceipt(
@@ -177,10 +198,71 @@ export function GoodsReceiptCard({
     }
   }
 
+  // Books the receipts in the ERP through the API, then shows what the ERP
+  // answered and the booked quantities it reports afterwards.
+  async function confirm(bestellungen: Wareneingang[]) {
+    if (bookingRequest.current || bestellungen.length === 0) return;
+    const controller = new AbortController();
+    bookingRequest.current = controller;
+    setBooking({ status: 'loading' });
+    try {
+      const data = await fetchGoodsReceiptBooking(
+        bestellungen,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      setBooking({ status: 'success', data });
+      setOrder({ status: 'success', order: data.order });
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setBooking({
+          status: 'error',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Could not book the goods receipt. Please try again.',
+        });
+      }
+    } finally {
+      if (bookingRequest.current === controller) bookingRequest.current = null;
+    }
+  }
+
   const missingCount =
     result.status === 'success'
       ? result.data.items.reduce((sum, item) => sum + item.missing.length, 0)
       : 0;
+
+  function articleName(positionNumber: number): string {
+    if (result.status === 'success') {
+      const item = result.data.items.find(
+        (candidate) => candidate.Positionnummer === positionNumber,
+      );
+      if (item?.Artikelbezeichnung) return item.Artikelbezeichnung;
+    }
+    if (order.status === 'success') {
+      const position = order.order.positionen.find(
+        (candidate) => candidate.Positionnummer === positionNumber,
+      );
+      if (position) return position.Artikelbezeichnung;
+    }
+    return '';
+  }
+
+  // After a partial failure, only the rejected positions are sent again.
+  function bookingsToConfirm(bestellungen: Wareneingang[]): Wareneingang[] {
+    if (booking.status !== 'success') return bestellungen;
+    const failed = new Set(
+      booking.data.results
+        .filter((entry) => !entry.booked)
+        .map((entry) => entry.Positionnummer),
+    );
+    return bestellungen.filter((receipt) =>
+      receipt.positionen.some((position) =>
+        failed.has(position.Positionnummer),
+      ),
+    );
+  }
 
   return (
     <section
@@ -194,12 +276,12 @@ export function GoodsReceiptCard({
           {order.status === 'success' ? order.order.Bestellnummer : '…'}
         </span>
       </div>
-      <h2 id="goods-receipt-title">Say what arrived. Get the booking JSON.</h2>
+      <h2 id="goods-receipt-title">Say what arrived. Book it with one tap.</h2>
       <p className="intro">
         Name the article (name or article number), quantity, bin (Lagerort), and
         batch (Charge) for each position. Claude matches your words to the open
-        purchase order below and builds the goods receipt JSON with the ERP
-        position numbers and prices.
+        purchase order below, you check the result, and Confirm books it in the
+        ERP.
       </p>
 
       <div className="order-panel">
@@ -315,7 +397,7 @@ export function GoodsReceiptCard({
           ? 'Asking Claude…'
           : result.status === 'success'
             ? result.data.complete
-              ? 'JSON created. Every article has all required details.'
+              ? 'JSON created. Check the table, then confirm to book it in the ERP.'
               : `${missingCount} detail${missingCount === 1 ? '' : 's'} missing. The JSON is created only when everything is said.`
             : 'Text is sent to Claude only when you select Create goods receipt JSON.'}
       </p>
@@ -374,47 +456,156 @@ export function GoodsReceiptCard({
             )}
           </div>
           {result.data.complete && result.data.bestellungen.length > 0 ? (
-            <div className="json-result">
+            <div className="booking">
               <div className="transcript-heading">
-                <h3>Wareneingang JSON</h3>
+                <h3>Goods receipt to book</h3>
                 <span className="field-hint">
                   {result.data.bestellungen.length === 1
                     ? 'One booking'
-                    : `${result.data.bestellungen.length} separate bookings, one per position`}
+                    : `${result.data.bestellungen.length} bookings, one per position`}
+                  {' · order '}
+                  {result.data.bestellungen[0]?.Bestellnummer}
+                  {' · dated '}
+                  {result.data.bestellungen[0]?.Wareneingangsdatum}
                 </span>
               </div>
-              {result.data.bestellungen.map((receipt, index) => {
-                const position = receipt.positionen[0];
-                return (
-                  <div className="json-block" key={index}>
-                    <div className="transcript-heading">
-                      <h4>
-                        Booking {index + 1} of {result.data.bestellungen.length}
-                        {position
-                          ? ` · Position ${position.Positionnummer} · ${position.Artikelnummer}`
-                          : ''}
-                      </h4>
-                      <button
-                        className="clear-button"
-                        type="button"
-                        onClick={() => {
-                          void copyJson(index);
-                        }}
+              <div className="order-panel">
+                <table
+                  className="order-table booking-table"
+                  aria-label="Goods receipt to book"
+                >
+                  <thead>
+                    <tr>
+                      <th scope="col">#</th>
+                      <th scope="col">Pos</th>
+                      <th scope="col">Article</th>
+                      <th scope="col">Bin</th>
+                      <th scope="col" className="num">
+                        Qty
+                      </th>
+                      <th scope="col">Batch</th>
+                      <th scope="col">Expiry</th>
+                      <th scope="col">Serial</th>
+                      <th scope="col" className="num">
+                        Price
+                      </th>
+                      <th scope="col">Invoice</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.data.bestellungen.flatMap((receipt, index) =>
+                      receipt.positionen.flatMap((position) =>
+                        position.VCS.map((entry, entryIndex) => (
+                          <tr
+                            key={`${index}-${position.Positionnummer}-${entryIndex}`}
+                          >
+                            <td>{index + 1}</td>
+                            <td>{position.Positionnummer}</td>
+                            <td className="wrap">
+                              {articleName(position.Positionnummer)}
+                              <span className="cell-sub">
+                                {position.Artikelnummer}
+                              </span>
+                            </td>
+                            <td>{position.Lagerort}</td>
+                            <td className="num">{entry.Menge}</td>
+                            <td>{entry.Charge}</td>
+                            <td>{entry.Verfalldatum}</td>
+                            <td>{entry.Seriennummer}</td>
+                            <td className="num">
+                              {position.Einkaufpreis.toFixed(2)}
+                            </td>
+                            <td>{receipt.Lieferanten_Rechnungsnummer}</td>
+                          </tr>
+                        )),
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {result.data.bestellungen.map((receipt, index) => (
+                <details className="json-details" key={index}>
+                  <summary>
+                    JSON for booking {index + 1} (position{' '}
+                    {receipt.positionen[0]?.Positionnummer})
+                  </summary>
+                  <button
+                    className="clear-button"
+                    type="button"
+                    onClick={() => {
+                      void copyJson(index);
+                    }}
+                  >
+                    {copied === index ? 'Copied' : 'Copy JSON'}
+                  </button>
+                  <pre tabIndex={0} aria-label={`Generated JSON ${index + 1}`}>
+                    <code>
+                      {JSON.stringify({ bestellung: receipt }, null, 2)}
+                    </code>
+                  </pre>
+                </details>
+              ))}
+              <div className="booking-actions">
+                <button
+                  type="button"
+                  disabled={
+                    booking.status === 'loading' ||
+                    (booking.status === 'success' && booking.data.allBooked)
+                  }
+                  onClick={() => {
+                    void confirm(bookingsToConfirm(result.data.bestellungen));
+                  }}
+                >
+                  {booking.status === 'loading'
+                    ? 'Booking in ERP…'
+                    : booking.status === 'success'
+                      ? booking.data.allBooked
+                        ? 'Booked in ERP'
+                        : 'Retry rejected bookings'
+                      : 'Confirm and book in ERP'}
+                </button>
+                <span className="field-hint" role="status">
+                  {booking.status === 'loading'
+                    ? 'Sending each booking to the ERP…'
+                    : booking.status === 'success'
+                      ? booking.data.allBooked
+                        ? 'Every position was booked. The order above shows the new quantities.'
+                        : 'Some positions were not booked. See the ERP messages below.'
+                      : 'Each position is booked with its own call to the ERP.'}
+                </span>
+              </div>
+              {booking.status === 'error' && (
+                <p className="transcription-error" role="alert">
+                  {booking.message}
+                </p>
+              )}
+              {booking.status === 'success' && (
+                <ul className="booking-results" aria-label="Booking results">
+                  {booking.data.results.map((entry, index) => (
+                    <li key={index}>
+                      <span
+                        className={entry.booked ? 'badge-ok' : 'badge-fail'}
                       >
-                        {copied === index ? 'Copied' : 'Copy JSON'}
-                      </button>
-                    </div>
-                    <pre
-                      tabIndex={0}
-                      aria-label={`Generated JSON ${index + 1}`}
-                    >
-                      <code>
-                        {JSON.stringify({ bestellung: receipt }, null, 2)}
-                      </code>
-                    </pre>
-                  </div>
-                );
-              })}
+                        {entry.booked ? '✓ Booked' : '✗ Not booked'}
+                      </span>{' '}
+                      Position {entry.Positionnummer} ·{' '}
+                      {articleName(entry.Positionnummer) || entry.Artikelnummer}{' '}
+                      · {entry.Zubuchmenge} units · booked {entry.bookedBefore}{' '}
+                      → {entry.bookedAfter} · invoice{' '}
+                      {entry.Lieferanten_Rechnungsnummer}
+                      {entry.return.length > 0 && (
+                        <ul className="erp-messages">
+                          {entry.return.map((message, messageIndex) => (
+                            <li key={messageIndex}>
+                              {message.returncode}: {message.message}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           ) : (
             <div className="missing-box" role="alert">

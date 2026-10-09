@@ -25,6 +25,7 @@ vi.mock('../hooks/use-transcription', () => ({
 }));
 vi.mock('../lib/api', () => ({
   fetchGoodsReceipt: vi.fn(),
+  fetchGoodsReceiptBooking: vi.fn(),
   fetchGoodsReceiptOrder: vi.fn(),
 }));
 

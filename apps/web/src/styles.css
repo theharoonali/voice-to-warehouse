@@ -599,3 +599,63 @@ select:disabled {
   font-size: 12px;
   font-weight: 600;
 }
+/* Goods receipt bookings */
+.booking {
+  margin-top: 22px;
+}
+.booking h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.booking-table td {
+  vertical-align: top;
+  white-space: nowrap;
+}
+.booking-table td.wrap {
+  white-space: normal;
+}
+.booking-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+.booking-actions .field-hint {
+  margin: 0;
+}
+.json-details {
+  margin-top: 12px;
+}
+.json-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #637169;
+}
+.json-details pre {
+  margin-top: 8px;
+}
+.booking-results {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.booking-results li + li {
+  margin-top: 8px;
+}
+.badge-ok {
+  color: #2f5a28;
+  font-weight: 700;
+}
+.badge-fail {
+  color: #a3261a;
+  font-weight: 700;
+}
+.erp-messages {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: #657361;
+}

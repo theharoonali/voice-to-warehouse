@@ -138,3 +138,55 @@ export type GoodsReceiptRequiredField = z.infer<
 export type GoodsReceiptItem = z.infer<typeof goodsReceiptItemSchema>;
 export type GoodsReceipt = z.infer<typeof goodsReceiptSchema>;
 export type GoodsReceiptResponse = z.infer<typeof goodsReceiptResponseSchema>;
+
+// Booking the receipts in the ERP (IMP015, one position per call).
+export const erpReturnSchema = z.object({
+  returncode: z.string(),
+  message: z.string(),
+});
+
+export const goodsReceiptBookRequestSchema = z.object({
+  bestellungen: z
+    .array(wareneingangSchema)
+    .min(1, 'There is nothing to book.')
+    .max(50, 'Book 50 positions or fewer at once.'),
+});
+
+export const goodsReceiptBookingResultSchema = z.object({
+  Positionnummer: z.number().int(),
+  Artikelnummer: z.string(),
+  Zubuchmenge: z.number(),
+  Lieferanten_Rechnungsnummer: z.string(),
+  booked: z
+    .boolean()
+    .describe(
+      'True when the ERP accepted the receipt and the booked quantity of the position increased.',
+    ),
+  bookedBefore: z.number(),
+  bookedAfter: z.number(),
+  return: z.array(erpReturnSchema).describe('The ERP return codes.'),
+});
+
+export const goodsReceiptBookingSchema = z.object({
+  allBooked: z.boolean(),
+  results: z.array(goodsReceiptBookingResultSchema),
+  // The order as read from the ERP after booking.
+  order: goodsReceiptOrderSchema,
+});
+
+export const goodsReceiptBookResponseSchema = z.object({
+  success: z.literal(true),
+  data: goodsReceiptBookingSchema,
+});
+
+export type ErpReturn = z.infer<typeof erpReturnSchema>;
+export type GoodsReceiptBookRequest = z.infer<
+  typeof goodsReceiptBookRequestSchema
+>;
+export type GoodsReceiptBookingResult = z.infer<
+  typeof goodsReceiptBookingResultSchema
+>;
+export type GoodsReceiptBooking = z.infer<typeof goodsReceiptBookingSchema>;
+export type GoodsReceiptBookResponse = z.infer<
+  typeof goodsReceiptBookResponseSchema
+>;
