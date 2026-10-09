@@ -225,7 +225,7 @@ export function ConfirmationPanel({
               {result.data.items.length > 0 ? (
                 <div className="table-scroll">
                   <table
-                    className="data-table"
+                    className="data-table stack-table"
                     aria-label="Recognised articles"
                   >
                     <thead>
@@ -242,19 +242,19 @@ export function ConfirmationPanel({
                     <tbody>
                       {result.data.items.map((item, index) => (
                         <tr key={index}>
-                          <td className="wrap">
+                          <td className="wrap" data-label="Article">
                             <ArticleCell item={item} />
                           </td>
-                          <td className="num">
+                          <td className="num" data-label="Quantity">
                             {item.Zubuchmenge ?? <Missing label="not said" />}
                           </td>
-                          <td className="code">
+                          <td className="code" data-label="Bin">
                             {item.Lagerort ?? <Missing label="not said" />}
                           </td>
-                          <td className="code">
+                          <td className="code" data-label="Batch">
                             {item.Charge ?? <Missing label="not said" />}
                           </td>
-                          <td>
+                          <td data-label="Expiry">
                             <ExpiryCell
                               item={item}
                               onSave={(value) =>
@@ -287,12 +287,14 @@ export function ConfirmationPanel({
                 </div>
                 <div className="table-scroll">
                   <table
-                    className="data-table"
+                    className="data-table stack-table"
                     aria-label="Goods receipt to book"
                   >
                     <thead>
                       <tr>
-                        <th scope="col">#</th>
+                        <th scope="col" className="mobile-hide">
+                          #
+                        </th>
                         <th scope="col">Pos</th>
                         <th scope="col">Article</th>
                         <th scope="col">Bin</th>
@@ -315,23 +317,37 @@ export function ConfirmationPanel({
                             <tr
                               key={`${index}-${position.Positionnummer}-${lineIndex}`}
                             >
-                              <td>{index + 1}</td>
-                              <td>{position.Positionnummer}</td>
-                              <td className="wrap">
+                              <td className="mobile-hide" data-label="#">
+                                {index + 1}
+                              </td>
+                              <td data-label="Position">
+                                {position.Positionnummer}
+                              </td>
+                              <td className="wrap" data-label="Article">
                                 {receipt.articleName(position.Positionnummer)}
                                 <span className="cell-sub">
                                   {position.Artikelnummer}
                                 </span>
                               </td>
-                              <td className="code">{position.Lagerort}</td>
-                              <td className="num">{line.Menge}</td>
-                              <td className="code">{line.Charge}</td>
-                              <td className="code">{line.Verfalldatum}</td>
-                              <td className="code">{line.Seriennummer}</td>
-                              <td className="num">
+                              <td className="code" data-label="Bin">
+                                {position.Lagerort}
+                              </td>
+                              <td className="num" data-label="Quantity">
+                                {line.Menge}
+                              </td>
+                              <td className="code" data-label="Batch">
+                                {line.Charge}
+                              </td>
+                              <td className="code" data-label="Expiry">
+                                {line.Verfalldatum}
+                              </td>
+                              <td className="code" data-label="Serial">
+                                {line.Seriennummer}
+                              </td>
+                              <td className="num" data-label="Price">
                                 {position.Einkaufpreis.toFixed(2)}
                               </td>
-                              <td className="code">
+                              <td className="code" data-label="Invoice">
                                 {entry.Lieferanten_Rechnungsnummer}
                               </td>
                             </tr>

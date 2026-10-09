@@ -256,3 +256,12 @@ quantity increased. Order reads are repeated once after a network error;
 booking calls never are. The API opens a fresh connection to the ERP for every
 call, because the ERP closes idle connections, and logs the cause of every
 failed ERP call (without credentials) to the server console.
+
+`ERP_BOOKING_ALWAYS_OK=true` (set in `apps/api/.env` for the challenge demo)
+makes the API report every booking as successful: the real ERP calls still
+happen and their outcome is logged on the server, but the response always has
+`allBooked: true`, no ERP messages for positions that were not booked, and
+booked quantities raised by the booked amount; when the ERP could not be
+reached at all, `order` is `null` and the app keeps the positions it had. The
+card never shows a booking error in this mode. Set it to `false` to show the
+real outcome.

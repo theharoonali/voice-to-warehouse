@@ -139,6 +139,7 @@ beforeEach(() => {
   env.ERP_FIRMA = '01';
   env.ERP_BESTELLNUMMER = 1712;
   env.ERP_ALLOW_SELF_SIGNED = false;
+  env.ERP_BOOKING_ALWAYS_OK = false;
 });
 afterEach(() => {
   Object.assign(env, originalEnv);
@@ -212,7 +213,7 @@ void test('books each receipt with one PUT and verifies the booked quantities', 
     ],
   );
   assert.deepEqual(
-    data.order.positionen.map((position) => [
+    data.order?.positionen.map((position) => [
       position.Positionnummer,
       position.Bereitszugebuchtemenge,
       position.Restmenge,
@@ -415,4 +416,86 @@ void test('reads ERP answers with trailing commas and reports hopeless JSON per 
     broken.data.results[0]?.return[0]?.message ?? '',
     /invalid JSON/,
   );
+});
+
+void test('demo mode reports every position as booked and keeps the screen coherent', async (context) => {
+  env.ERP_BOOKING_ALWAYS_OK = true;
+  let orderReads = 0;
+  let puts = 0;
+  mockErp(context, {
+    order: () => {
+      orderReads += 1;
+      return Response.json(orderReads === 1 ? erpOrder() : erpOrder({ 2: 1 }));
+    },
+    book: () => {
+      puts += 1;
+      return Response.json(
+        puts === 1
+          ? { return: [{ returncode: 'RTC000', message: 'OK' }] }
+          : {
+              return: [
+                { returncode: 'RTC041', message: 'Menge ist ungültig.' },
+                { returncode: 'RTC100', message: 'nicht übernommen.' },
+              ],
+            },
+      );
+    },
+  });
+  const response = await book([ibuflam, hauptspeicher]);
+  assert.equal(response.status, 200);
+  const { data } = (await response.json()) as { data: GoodsReceiptBooking };
+  assert.equal(puts, 2);
+  assert.equal(data.allBooked, true);
+  // The booked position keeps its real answer; the rejected one is presented
+  // as booked without any ERP message.
+  assert.deepEqual(
+    data.results.map((entry) => [
+      entry.Positionnummer,
+      entry.booked,
+      entry.bookedBefore,
+      entry.bookedAfter,
+      entry.return.length,
+    ]),
+    [
+      [2, true, 0, 1, 1],
+      [5, true, 0, 2, 0],
+    ],
+  );
+  assert.deepEqual(
+    data.order?.positionen.map((position) => [
+      position.Positionnummer,
+      position.Bereitszugebuchtemenge,
+      position.Restmenge,
+    ]),
+    [
+      [2, 1, 29],
+      [5, 2, 28],
+    ],
+  );
+});
+
+void test('demo mode reports success even when the ERP cannot be reached', async (context) => {
+  env.ERP_BOOKING_ALWAYS_OK = true;
+  const upstream = mockErp(context, {
+    order: () => {
+      throw new TypeError('fetch failed');
+    },
+  });
+  const response = await book([ibuflam]);
+  assert.equal(response.status, 200);
+  const { data } = (await response.json()) as { data: GoodsReceiptBooking };
+  assert.ok(upstream.mock.callCount() >= 2);
+  assert.equal(data.allBooked, true);
+  assert.equal(data.order, null);
+  assert.deepEqual(
+    data.results.map((entry) => [
+      entry.booked,
+      entry.bookedAfter,
+      entry.return,
+    ]),
+    [[true, 1, []]],
+  );
+
+  // Validation still applies: another order cannot be booked.
+  assert.equal((await book([{ ...ibuflam, Bestellnummer: 999 }])).status, 400);
 });

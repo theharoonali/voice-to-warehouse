@@ -678,8 +678,73 @@ h3 {
     font-size: 17px;
   }
   .artnr,
-  .qty {
+  .qty,
+  .mobile-hide {
     display: none;
+  }
+  /* The sheet header wraps instead of clipping the cue and the buttons. */
+  .panel-tools {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .voice-cue {
+    white-space: normal;
+  }
+  .sheet-panel {
+    max-height: 92vh;
+  }
+  /* Confirmation tables become one label/value list per article: nothing
+     scrolls sideways and every field stays readable. */
+  .stack-table,
+  .stack-table tbody,
+  .stack-table tr,
+  .stack-table td {
+    display: block;
+    width: 100%;
+  }
+  .stack-table thead {
+    display: none;
+  }
+  .table-scroll:has(.stack-table) {
+    overflow: visible;
+    background: transparent;
+  }
+  .stack-table tr {
+    padding: 6px 12px;
+    margin-bottom: 8px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+  .stack-table td,
+  .stack-table td.wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
+    padding: 5px 0;
+    border: 0;
+    background: transparent;
+    text-align: right;
+    white-space: normal;
+  }
+  .stack-table td.mobile-hide {
+    display: none;
+  }
+  .stack-table td::before {
+    content: attr(data-label);
+    flex: none;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-align: left;
+  }
+  .stack-table .cell-sub {
+    text-align: right;
+  }
+  .stack-table .expiry-edit {
+    justify-content: flex-end;
   }
 }
 @media (max-width: 560px) {

@@ -195,7 +195,7 @@ export function useGoodsReceipt({
       );
       if (controller.signal.aborted) return;
       setBooking({ status: 'success', data });
-      setOrder({ status: 'success', order: data.order });
+      if (data.order) setOrder({ status: 'success', order: data.order });
     } catch (error) {
       if (!controller.signal.aborted) {
         setBooking({

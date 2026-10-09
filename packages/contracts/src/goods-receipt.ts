@@ -170,8 +170,9 @@ export const goodsReceiptBookingResultSchema = z.object({
 export const goodsReceiptBookingSchema = z.object({
   allBooked: z.boolean(),
   results: z.array(goodsReceiptBookingResultSchema),
-  // The order as read from the ERP after booking.
-  order: goodsReceiptOrderSchema,
+  // The order as read from the ERP after booking; null when it could not be
+  // read (only in demo mode, which reports success regardless).
+  order: goodsReceiptOrderSchema.nullable(),
 });
 
 export const goodsReceiptBookResponseSchema = z.object({

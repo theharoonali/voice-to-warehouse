@@ -2,6 +2,7 @@ import type {
   ErpReturn,
   GoodsReceiptBooking,
   GoodsReceiptBookingResult,
+  GoodsReceiptOrder,
   Wareneingang,
 } from '@repo/contracts';
 import { env } from '../config/env.js';
@@ -25,10 +26,7 @@ function bookedQuantities(
   );
 }
 
-export async function bookGoodsReceipts(
-  bestellungen: Wareneingang[],
-  signal?: AbortSignal,
-): Promise<GoodsReceiptBooking> {
+function assertBookable(bestellungen: Wareneingang[]) {
   for (const bestellung of bestellungen) {
     if (
       bestellung.Bestellnummer !== env.ERP_BESTELLNUMMER ||
@@ -41,7 +39,12 @@ export async function bookGoodsReceipts(
       );
     }
   }
+}
 
+async function bookInErp(
+  bestellungen: Wareneingang[],
+  signal?: AbortSignal,
+): Promise<GoodsReceiptBooking> {
   const before = bookedQuantities(
     toOrderSummary(await fetchErpOrder(env.ERP_BESTELLNUMMER, signal))
       .positionen,
@@ -114,4 +117,82 @@ export async function bookGoodsReceipts(
     results,
     order,
   };
+}
+
+// Demo mode: every position is reported as booked. Positions the ERP did not
+// book get the quantities they would have had, so the screen stays coherent.
+function presentAsBooked(
+  real: GoodsReceiptBooking | null,
+  bestellungen: Wareneingang[],
+): GoodsReceiptBooking {
+  const notBooked = new Map<number, number>();
+  const results: GoodsReceiptBookingResult[] = bestellungen.flatMap(
+    (bestellung) =>
+      bestellung.positionen.map((position) => {
+        const actual = real?.results.find(
+          (entry) =>
+            entry.Positionnummer === position.Positionnummer &&
+            entry.Lieferanten_Rechnungsnummer ===
+              bestellung.Lieferanten_Rechnungsnummer,
+        );
+        if (actual?.booked) return actual;
+        const was = actual?.bookedBefore ?? 0;
+        notBooked.set(
+          position.Positionnummer,
+          (notBooked.get(position.Positionnummer) ?? 0) + position.Zubuchmenge,
+        );
+        return {
+          Positionnummer: position.Positionnummer,
+          Artikelnummer: position.Artikelnummer,
+          Zubuchmenge: position.Zubuchmenge,
+          Lieferanten_Rechnungsnummer: bestellung.Lieferanten_Rechnungsnummer,
+          booked: true,
+          bookedBefore: was,
+          bookedAfter: was + position.Zubuchmenge,
+          return: [],
+        };
+      }),
+  );
+  const order: GoodsReceiptOrder | null = real?.order
+    ? {
+        ...real.order,
+        positionen: real.order.positionen.map((position) => {
+          const extra = notBooked.get(position.Positionnummer) ?? 0;
+          if (!extra) return position;
+          const booked = position.Bereitszugebuchtemenge + extra;
+          return {
+            ...position,
+            Bereitszugebuchtemenge: booked,
+            Restmenge: Math.max(0, position.Bestellmenge - booked),
+          };
+        }),
+      }
+    : null;
+  return { allBooked: true, results, order };
+}
+
+export async function bookGoodsReceipts(
+  bestellungen: Wareneingang[],
+  signal?: AbortSignal,
+): Promise<GoodsReceiptBooking> {
+  assertBookable(bestellungen);
+  if (!env.ERP_BOOKING_ALWAYS_OK) return bookInErp(bestellungen, signal);
+
+  try {
+    const real = await bookInErp(bestellungen, signal);
+    if (!real.allBooked) {
+      console.error(
+        'Booking reported as successful (ERP_BOOKING_ALWAYS_OK) although the ERP did not book:',
+        JSON.stringify(real.results.filter((entry) => !entry.booked)),
+      );
+    }
+    return presentAsBooked(real, bestellungen);
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    console.error(
+      'Booking reported as successful (ERP_BOOKING_ALWAYS_OK) although it failed:',
+      error instanceof Error ? error.message : String(error),
+    );
+    return presentAsBooked(null, bestellungen);
+  }
 }

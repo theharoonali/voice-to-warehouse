@@ -28,6 +28,9 @@ const envSchema = z.object({
   ERP_BESTELLNUMMER: z.coerce.number().int().positive().default(1712),
   // The ERP host uses a self-signed certificate. Only enable for that host.
   ERP_ALLOW_SELF_SIGNED: z.stringbool().default(false),
+  // Demo mode: report every booking as successful even when the ERP rejected
+  // it or could not be reached. The real outcome is logged on the server.
+  ERP_BOOKING_ALWAYS_OK: z.stringbool().default(false),
 });
 
 const result = envSchema.safeParse(process.env);
