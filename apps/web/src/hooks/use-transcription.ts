@@ -178,7 +178,9 @@ export function useTranscription(
     }
   }
 
-  function stop() {
+  // immediate skips the short silence window that lets the last words finalize;
+  // used for spoken commands, which must take effect at once.
+  function stop(immediate = false) {
     const current = session.current;
     if (!current || current.stopping) return;
     current.stopping = true;
@@ -192,7 +194,7 @@ export function useTranscription(
       const { onEnd, ...words } = latest.current;
       onEnd?.(words);
     };
-    if (status !== 'listening' || !current.connection) {
+    if (immediate || status !== 'listening' || !current.connection) {
       finish();
       return;
     }

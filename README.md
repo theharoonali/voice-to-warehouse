@@ -9,7 +9,9 @@ Tap the microphone or press Space (unless a field has focus), allow
 microphone access, and say what arrived. A one-line caption under the
 microphone shows the latest words and fades out.
 Say "Done" or "Fertig" as the last word to
-finish, or "Cancel", "Abbrechen" or "Abbruch" to discard the recording.
+finish, or "Cancel", "Abbrechen" or "Abbruch" to discard the recording. Both
+act the moment the word appears in the live words, without waiting for the
+sentence to be finalized.
 Stopping by tap or Space also finishes it. As soon as the receipt is shown,
 the app listens again and the confirmation header shows turning rays with
 "Say Done to book": "Done" books the receipt in the ERP and refreshes the open

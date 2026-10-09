@@ -131,20 +131,21 @@ export function VoiceTranscriber() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [status, start, stop]);
 
-  // "Done" (or "Fertig") and "Cancel" (or "Abbrechen") end the recording.
-  // Only committed words count, so a half-heard word cannot end it.
+  // "Done" (or "Fertig") and "Cancel" (or "Abbrechen") end the recording the
+  // moment they appear in the live words, without waiting for the sentence to
+  // be finalized.
   useEffect(() => {
     if (status !== 'listening') return;
-    const last = segments.at(-1);
-    if (!last) return;
-    if (endsWithCancel(last)) {
+    const latest = partial || segments.at(-1);
+    if (!latest) return;
+    if (endsWithCancel(latest)) {
       cancelRequested.current = true;
-      stop();
-    } else if (endsWithDone(last)) {
+      stop(true);
+    } else if (endsWithDone(latest)) {
       doneRequested.current = true;
-      stop();
+      stop(true);
     }
-  }, [status, segments, stop]);
+  }, [status, segments, partial, stop]);
 
   const confirming = mode === 'confirm' && status === 'listening';
 

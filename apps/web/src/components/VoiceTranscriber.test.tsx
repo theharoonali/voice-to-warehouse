@@ -644,3 +644,31 @@ it('discards the shown receipt when the worker says cancel while confirming', as
   expect(fetchGoodsReceiptOrder).toHaveBeenCalledTimes(2);
   expect(screen.getAllByRole('status')[0]?.textContent).toContain('Cancelled');
 });
+
+it('acts on done and cancel as soon as they appear in the live words', async () => {
+  const { rerender } = await renderApp();
+  hook.status = 'listening';
+  hook.segments = ['Five Ibuflam in bin M53-01-01-02, batch AB1234.'];
+  hook.partial = 'done';
+  await rerenderApp(rerender);
+  expect(hook.stop).toHaveBeenCalledTimes(1);
+  expect(hook.stop).toHaveBeenLastCalledWith(true);
+  await stopRecording(rerender);
+  expect(fetchGoodsReceipt).toHaveBeenCalledWith(
+    'Five Ibuflam in bin M53-01-01-02, batch AB1234',
+    order,
+    expect.any(AbortSignal),
+  );
+
+  hook.status = 'listening';
+  hook.segments = [];
+  hook.partial = 'cancel';
+  await rerenderApp(rerender);
+  expect(hook.stop).toHaveBeenCalledTimes(2);
+  expect(hook.stop).toHaveBeenLastCalledWith(true);
+  await stopRecording(rerender);
+  expect(screen.getAllByRole('status')[0]?.textContent).toContain('Cancelled');
+  expect(
+    screen.queryByRole('table', { name: 'Goods receipt to book' }),
+  ).toBeNull();
+});
