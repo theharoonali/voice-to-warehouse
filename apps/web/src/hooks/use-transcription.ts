@@ -44,12 +44,25 @@ type Session = {
   stopping: boolean;
 };
 
-export function useTranscription(language: Language) {
+export type RecordedWords = { segments: string[]; partial: string };
+
+export function useTranscription(
+  language: Language,
+  options: {
+    // Called when a recording ends normally, with the words it produced.
+    onEnd?: (words: RecordedWords) => void;
+  } = {},
+) {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [segments, setSegments] = useState<string[]>([]);
   const [partial, setPartial] = useState('');
   const session = useRef<Session | null>(null);
+  // The latest words and callback, read when a recording ends.
+  const latest = useRef({ segments, partial, onEnd: options.onEnd });
+  useEffect(() => {
+    latest.current = { segments, partial, onEnd: options.onEnd };
+  });
 
   useEffect(() => {
     function release() {
@@ -176,6 +189,8 @@ export function useTranscription(language: Language) {
       session.current = null;
       current.connection?.close();
       setStatus('idle');
+      const { onEnd, ...words } = latest.current;
+      onEnd?.(words);
     };
     if (status !== 'listening' || !current.connection) {
       finish();

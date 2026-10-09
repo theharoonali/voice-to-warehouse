@@ -1,27 +1,106 @@
 import { useEffect, useRef, useState } from 'react';
-import { useTranscription, type Language } from '../hooks/use-transcription';
-import { endsWithDone, stripDoneWord } from '../lib/voice-commands';
+import { useGoodsReceipt } from '../hooks/use-goods-receipt';
+import { useMediaQuery } from '../hooks/use-media-query';
 import {
-  GoodsReceiptCard,
-  type GoodsReceiptCardHandle,
-} from './GoodsReceiptCard';
+  useTranscription,
+  type Language,
+  type RecordedWords,
+} from '../hooks/use-transcription';
+import {
+  endsWithCancel,
+  endsWithDone,
+  stripCommandWords,
+} from '../lib/voice-commands';
+import { CapturePanel } from './CapturePanel';
+import { ConfirmationPanel } from './ConfirmationPanel';
+import { OrderPanel } from './OrderPanel';
+
+// Below this width the confirmation opens as a sheet over the capture panel.
+const MOBILE_QUERY = '(max-width: 959px)';
+
+// capture: the words become a receipt. confirm: a receipt is shown and the
+// app listens for "Done" (book it), "Cancel" (discard it) or new words.
+type Mode = 'capture' | 'confirm';
 
 export function VoiceTranscriber() {
   const [language, setLanguage] = useState<Language>('en');
-  const { status, error, segments, partial, start, stop, clear } =
-    useTranscription(language);
-  const transcript = useRef<HTMLDivElement>(null);
-  const card = useRef<GoodsReceiptCardHandle>(null);
-  // Set when the worker said "Done": create the JSON once the recording ends.
-  const createOnIdle = useRef(false);
+  const [mode, setMode] = useState<Mode>('capture');
+  const [cancelled, setCancelled] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const doneRequested = useRef(false);
+  const cancelRequested = useRef(false);
+  // The hooks call these when a recording ends or a receipt was created. They
+  // are refreshed after every render so they see the latest state.
+  const handlers = useRef<{
+    end: (words: RecordedWords) => void;
+    created: () => void;
+  }>({
+    end: () => {},
+    created: () => {},
+  });
+
+  const { status, error, segments, partial, start, stop } = useTranscription(
+    language,
+    { onEnd: (words) => handlers.current.end(words) },
+  );
+  const receipt = useGoodsReceipt({
+    onCreated: () => handlers.current.created(),
+  });
+  const mobile = useMediaQuery(MOBILE_QUERY);
   const active = status !== 'idle';
-  const hasText = segments.length > 0 || Boolean(partial);
-  const transcriptText = [...segments, partial].filter(Boolean).join(' ');
+  const bookable =
+    receipt.result.status === 'success' &&
+    receipt.result.data.complete &&
+    receipt.result.data.bestellungen.length > 0;
 
   useEffect(() => {
-    if (transcript.current)
-      transcript.current.scrollTop = transcript.current.scrollHeight;
-  }, [segments, partial]);
+    handlers.current = {
+      // Once a receipt is shown, listen for the worker's confirmation.
+      created: () => {
+        setMode('confirm');
+        void start();
+      },
+      // While capturing, the words become a receipt. While confirming, "Done"
+      // books the receipt, "Cancel" discards it, and new words replace it.
+      end: (recorded) => {
+        const done = doneRequested.current;
+        const cancel = cancelRequested.current;
+        doneRequested.current = false;
+        cancelRequested.current = false;
+        const words = stripCommandWords(
+          [...recorded.segments, recorded.partial].filter(Boolean).join(' '),
+        );
+        if (cancel) {
+          receipt.cancel();
+          setCancelled(true);
+          setMode('capture');
+          return;
+        }
+        if (words) {
+          setCancelled(false);
+          setMode('capture');
+          void receipt.create(words);
+          return;
+        }
+        if (mode === 'confirm') {
+          setMode('capture');
+          if (done && bookable)
+            void receipt.confirm(receipt.bookingsToConfirm());
+        }
+      },
+    };
+  });
+
+  // A new result opens the confirmation sheet on small screens.
+  const [seenResult, setSeenResult] = useState(receipt.result);
+  if (receipt.result !== seenResult) {
+    setSeenResult(receipt.result);
+    if (
+      receipt.result.status === 'success' ||
+      receipt.result.status === 'error'
+    )
+      setSheetOpen(true);
+  }
 
   // The space bar starts a recording (and stops one), unless the user is
   // typing in a field.
@@ -50,209 +129,108 @@ export function VoiceTranscriber() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [status, start, stop]);
 
-  // Saying "Done" (or "Fertig") at the end stops the recording. Only committed
-  // words count, so a half-heard word cannot end it.
+  // "Done" (or "Fertig") and "Cancel" (or "Abbrechen") end the recording.
+  // Only committed words count, so a half-heard word cannot end it.
   useEffect(() => {
     if (status !== 'listening') return;
     const last = segments.at(-1);
-    if (last && endsWithDone(last)) {
-      createOnIdle.current = true;
+    if (!last) return;
+    if (endsWithCancel(last)) {
+      cancelRequested.current = true;
+      stop();
+    } else if (endsWithDone(last)) {
+      doneRequested.current = true;
       stop();
     }
-  }, [segments, status, stop]);
+  }, [status, segments, stop]);
 
-  // Once the recording has ended after "Done", create the JSON automatically.
-  useEffect(() => {
-    if (status !== 'idle' || !createOnIdle.current) return;
-    createOnIdle.current = false;
-    const text = stripDoneWord(transcriptText);
-    if (text) card.current?.create(text);
-  }, [status, transcriptText]);
+  const confirming = mode === 'confirm' && status === 'listening';
 
-  const statusText =
-    status === 'connecting'
-      ? 'Connecting · allow microphone access'
-      : status === 'listening'
-        ? 'Listening · say “Done” when you have finished'
-        : status === 'stopping'
-          ? 'Finishing your last words…'
-          : hasText
-            ? 'Recording complete'
-            : 'Ready when you are';
+  const confirmation = (className: string, onClose?: () => void) => (
+    <ConfirmationPanel
+      receipt={receipt}
+      awaitingVoice={confirming}
+      className={className}
+      onClose={onClose}
+    />
+  );
 
   return (
-    <main className="shell">
-      <header className="brand">
-        <span className="brand-mark" aria-hidden="true">
-          vw
-        </span>
-        Voice to Warehouse
-        <span className="brand-tag">VOICE WORKSPACE</span>
-      </header>
-      <section className="voice-card" aria-labelledby="voice-title">
-        <div className="card-heading">
-          <p className="eyebrow">LESS TYPING. MORE DOING.</p>
-          <span className="service-badge">Live transcription</span>
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <img
+            className="brand-mark"
+            src="/favicon.svg"
+            alt=""
+            aria-hidden="true"
+          />
+          <div className="brand-text">
+            <strong>Voice to Warehouse</strong>
+            <span>Goods receipt by voice</span>
+          </div>
         </div>
-        <h1 id="voice-title">
-          Your voice.
-          <br />
-          In words<span>.</span>
-        </h1>
-        <p className="intro">
-          Press Space or tap the microphone, say what arrived, and finish with
-          “Done”. The recording stops and the goods receipt JSON is created for
-          you.
-        </p>
-
-        <div className="language-row">
-          <label htmlFor="language">Speaking language</label>
-          <select
-            id="language"
-            value={language}
+        <div className="segmented" role="group" aria-label="Speaking language">
+          <button
+            type="button"
+            aria-pressed={language === 'en'}
             disabled={active}
-            onChange={(event) => setLanguage(event.target.value as Language)}
-            aria-describedby="language-hint"
+            onClick={() => setLanguage('en')}
           >
-            <option value="en">English</option>
-            <option value="de">Deutsch (German)</option>
-          </select>
-        </div>
-        <p id="language-hint" className="field-hint">
-          {active
-            ? 'Stop recording to change the language.'
-            : 'Choose the language you’ll speak. Your words stay in that language.'}
-        </p>
-
-        <div className={`voice-stage voice-stage--${status}`}>
-          <div className="voice-rings">
-            <button
-              className="mic-button"
-              type="button"
-              onClick={() => (active ? stop() : void start())}
-              disabled={status === 'stopping'}
-              aria-label={active ? 'Stop recording' : 'Start recording'}
-              aria-pressed={active}
-            >
-              {active ? (
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <rect
-                    x="6"
-                    y="6"
-                    width="12"
-                    height="12"
-                    rx="3"
-                    fill="currentColor"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <rect x="9" y="3" width="6" height="12" rx="3" />
-                  <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" />
-                </svg>
-              )}
-            </button>
-          </div>
-          <p className="mic-label">
-            {status === 'connecting'
-              ? 'Cancel connection'
-              : status === 'stopping'
-                ? 'Finishing recording'
-                : active
-                  ? 'Say “Done” to finish · tap or press Space to stop'
-                  : hasText
-                    ? 'Press Space or tap for a new recording'
-                    : 'Press Space or tap to start speaking'}
-          </p>
-          <p className="recording-status" role="status">
-            <span
-              className={`status-dot ${status === 'listening' ? 'status-dot--live' : ''}`}
-              aria-hidden="true"
-            />
-            {statusText}
-          </p>
-          <div
-            className="subtitle"
-            aria-live="polite"
-            aria-atomic="true"
-            lang={language}
+            EN
+          </button>
+          <button
+            type="button"
+            aria-pressed={language === 'de'}
+            disabled={active}
+            onClick={() => setLanguage('de')}
           >
-            {partial ||
-              segments.at(-1) ||
-              (status === 'listening'
-                ? 'Your words will appear here…'
-                : 'A little space for what you have to say.')}
-          </div>
+            DE
+          </button>
         </div>
+      </header>
 
-        {error && (
-          <p className="transcription-error" role="alert">
-            {error}
-          </p>
-        )}
+      <main className="workspace">
+        <CapturePanel
+          status={status}
+          error={error}
+          segments={segments}
+          partial={partial}
+          language={language}
+          cancelled={cancelled}
+          confirming={confirming}
+          onStart={start}
+          onStop={stop}
+        />
+        {!mobile && confirmation('panel panel--confirm')}
+        <OrderPanel order={receipt.order} />
+      </main>
 
-        <section
-          className="transcript-panel"
-          aria-labelledby="transcript-title"
+      {mobile && !sheetOpen && receipt.result.status !== 'idle' && (
+        <button
+          className="btn btn--primary sheet-launcher"
+          type="button"
+          onClick={() => setSheetOpen(true)}
         >
-          <div className="transcript-heading">
-            <h2 id="transcript-title">Your transcript</h2>
-            <button
-              className="clear-button"
-              type="button"
-              onClick={clear}
-              disabled={active || !hasText}
-            >
-              Clear
-            </button>
-          </div>
-          <div
-            className="transcript-text"
-            ref={transcript}
-            tabIndex={0}
-            lang={language}
-            aria-label="Transcript"
-          >
-            {hasText ? (
-              <p>
-                {segments.join(' ')}
-                {segments.length > 0 && partial ? ' ' : ''}
-                <span className="interim-text">{partial}</span>
-              </p>
-            ) : (
-              <p className="empty-transcript">
-                Your conversation takes shape here. Start the microphone to
-                begin.
-              </p>
-            )}
-          </div>
-          {partial && status === 'idle' && (
-            <p className="field-hint">
-              The lighter text is the last live preview; it was not finalized.
-            </p>
-          )}
-        </section>
-        <footer className="card-footer">
-          Audio is streamed to ElevenLabs while recording. Press Space to start;
-          say “Done” to stop and create the JSON. A new recording starts a fresh
-          transcript.
-        </footer>
-      </section>
-      <GoodsReceiptCard
-        ref={card}
-        transcript={stripDoneWord(transcriptText)}
-        recording={active}
-      />
-      <footer className="page-footer">
-        Powered by ElevenLabs <span>/</span> Claude <span>/</span> Byte ERP
-      </footer>
-    </main>
+          Show confirmation
+        </button>
+      )}
+      {mobile && sheetOpen && (
+        <div
+          className="sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirmation-title"
+        >
+          <button
+            className="sheet-backdrop"
+            type="button"
+            aria-label="Close confirmation"
+            onClick={() => setSheetOpen(false)}
+          />
+          {confirmation('sheet-panel', () => setSheetOpen(false))}
+        </div>
+      )}
+    </div>
   );
 }

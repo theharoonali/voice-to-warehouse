@@ -5,14 +5,24 @@ Innovation Challenge Project
 ## Live voice transcription
 
 The React frontend streams microphone audio to ElevenLabs Scribe v2 Realtime.
-Choose English or German, press the microphone (or the space bar, unless a
-text field has focus), and allow microphone access. Say “Done” or “Fertig” as
-the last word: the recording stops, the word is removed from the transcript,
-and the goods receipt JSON is created automatically. Space also stops a
-recording by hand, which only fills the text field.
-Live subtitles appear below the microphone, with the full transcript underneath.
-Stop recording before changing language. Each new recording starts a fresh
-transcript; stopping retains the current text. Lighter text is an interim result.
+Tap the microphone or press Space (unless a field has focus), allow
+microphone access, and say what arrived. A one-line caption under the
+microphone shows the latest words and fades out.
+Say "Done" or "Fertig" as the last word to
+finish, or "Cancel", "Abbrechen" or "Abbruch" to discard the recording.
+Stopping by tap or Space also finishes it. As soon as the receipt is shown,
+the app listens again and the confirmation header shows turning rays with
+"Say Done to book": "Done" books the receipt in the ERP and refreshes the open
+positions, "Cancel" discards it, and saying the articles again replaces it.
+The EN/DE toggle in the header is disabled while recording. Voice is the only
+input; there is no text field.
+
+The app is one fixed-height page without a page scroll: a header, the capture
+panel "Agent" (4 of 12 columns) next to the confirmation panel (8 columns),
+and "Open Positions" below, scrolling inside their own panel. Panels have no
+borders on a light blue canvas; the header keeps a light bottom border. Under 960px the
+capture panel sits on top of the open positions and the confirmation opens as
+a bottom sheet whenever a receipt is created; "Show confirmation" reopens it.
 
 ### Local setup
 
@@ -100,8 +110,8 @@ each conversion. The API gives Claude only the relevant position data (position
 number, article numbers, name, ordered, booked, remaining) and the text; Claude
 decides which position each spoken article belongs to and extracts quantity,
 bin, batch, and expiry. Position numbers, article numbers, and prices always
-come from the ERP data. A finished recording fills the text field
-automatically; nothing is sent until **Create goods receipt JSON** is selected.
+come from the ERP data. Every finished recording is sent automatically unless
+it was cancelled.
 
 Set these in `apps/api/.env` (see `.env.example`): `ERP_BASE_URL`,
 `ERP_USERNAME`, `ERP_PASSWORD`, `ERP_FIRMA` (default `01`), `ERP_BESTELLNUMMER`
@@ -206,7 +216,10 @@ both the ERP and Anthropic over HTTP.
 
 ### Confirm and book in the ERP
 
-When the JSON is complete, the card shows the bookings as a table (position,
+When the JSON is complete, the confirmation panel shows the recognised
+articles (a cross marks every detail that was not said; "Add expiry date"
+sets a date the worker did not say and updates the JSON) and the bookings as
+a table (position,
 article, bin, quantity, batch, expiry, serial, price, invoice number) with the
 raw JSON available per booking under "JSON for booking n". **Confirm and book
 in ERP** sends them to `POST /api/v1/goods-receipt/book`
