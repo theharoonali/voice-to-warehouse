@@ -71,9 +71,11 @@ export function VoiceTranscriber() {
           [...recorded.segments, recorded.partial].filter(Boolean).join(' '),
         );
         if (cancel) {
-          receipt.cancel();
+          // "Cancel" starts over: no result, no booking, fresh open positions.
+          receipt.reset();
           setCancelled(true);
           setMode('capture');
+          setSheetOpen(false);
           return;
         }
         if (words) {
@@ -166,8 +168,8 @@ export function VoiceTranscriber() {
             aria-hidden="true"
           />
           <div className="brand-text">
-            <strong>Voice to Warehouse</strong>
-            <span>Goods receipt by voice</span>
+            <strong>ANVY</strong>
+            <span>AI-powered goods receipt</span>
           </div>
         </div>
         <div className="segmented" role="group" aria-label="Speaking language">

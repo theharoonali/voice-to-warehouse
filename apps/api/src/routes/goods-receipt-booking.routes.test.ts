@@ -379,3 +379,40 @@ void test('rejects booking bodies for another order or without receipts', async 
   }
   assert.equal(upstream.mock.callCount(), 0);
 });
+
+void test('reads ERP answers with trailing commas and reports hopeless JSON per position', async (context) => {
+  let orderReads = 0;
+  mockErp(context, {
+    order: () => {
+      orderReads += 1;
+      return Response.json(orderReads === 1 ? erpOrder() : erpOrder({ 2: 1 }));
+    },
+    book: () =>
+      new Response(
+        '{ "return": [{"returncode": "RTC000", "message": "Zubuchen Ware wurde übernommen.",},],}',
+        { headers: { 'content-type': 'application/json' } },
+      ),
+  });
+  const { data } = (await (await book([ibuflam])).json()) as {
+    data: GoodsReceiptBooking;
+  };
+  assert.deepEqual(data.results[0]?.return, [
+    { returncode: 'RTC000', message: 'Zubuchen Ware wurde übernommen.' },
+  ]);
+  assert.equal(data.results[0]?.booked, true);
+
+  mockErp(context, {
+    book: () =>
+      new Response('<html>Service unavailable</html>', {
+        headers: { 'content-type': 'text/html' },
+      }),
+  });
+  const broken = (await (await book([ibuflam])).json()) as {
+    data: GoodsReceiptBooking;
+  };
+  assert.equal(broken.data.results[0]?.booked, false);
+  assert.match(
+    broken.data.results[0]?.return[0]?.message ?? '',
+    /invalid JSON/,
+  );
+});

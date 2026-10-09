@@ -16,7 +16,13 @@ export default defineConfig(({ mode }) => {
     // discovers it on first use, re-bundles, and an open page can be left with a
     // stale module URL ("Failed to fetch dynamically imported module").
     optimizeDeps: { include: ['@elevenlabs/client'] },
-    server: { host: '127.0.0.1', port: 3000, strictPort: true, proxy },
-    preview: { host: '127.0.0.1', port: 3000, strictPort: true, proxy },
+    server: {
+      host: true,
+      port: 3000,
+      strictPort: true,
+      allowedHosts: ['.trycloudflare.com'],
+      proxy,
+    },
+    preview: { host: true, port: 3000, strictPort: true, proxy },
   };
 });

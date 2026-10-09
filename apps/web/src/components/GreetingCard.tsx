@@ -54,7 +54,7 @@ export function GreetingCard() {
         <span className="brand-mark" aria-hidden="true">
           vw
         </span>{' '}
-        Voice to Warehouse
+        ANVY
       </header>
       <section className="greeting-card" aria-labelledby="greeting-title">
         <p className="eyebrow">A SMALL START. A SOLID FOUNDATION.</p>

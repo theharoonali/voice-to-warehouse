@@ -279,7 +279,7 @@ it('shows the open order positions with ordered, booked and remaining', async ()
   expect(
     positions.getByRole('row', { name: /USB Data Cabel/ }).textContent,
   ).toContain('fully booked');
-  expect(screen.getByText('Goods receipt by voice')).toBeTruthy();
+  expect(screen.getByText('AI-powered goods receipt')).toBeTruthy();
   expect(screen.queryByText(/1712/)).toBeNull();
 });
 
@@ -640,4 +640,7 @@ it('discards the shown receipt when the worker says cancel while confirming', as
   expect(
     screen.getByText('Say what arrived and finish with “Done”.'),
   ).toBeTruthy();
+  // The whole state starts over, including a fresh read of the open positions.
+  expect(fetchGoodsReceiptOrder).toHaveBeenCalledTimes(2);
+  expect(screen.getAllByRole('status')[0]?.textContent).toContain('Cancelled');
 });

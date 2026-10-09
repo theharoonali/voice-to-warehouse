@@ -230,12 +230,13 @@ order. The browser cannot call the ERP itself: its preflight request is
 answered with 401 and no CORS headers, the certificate is self-signed, and the
 credentials must stay on the server.
 
-The ERP answers every booking with HTTP 200 and a list of return codes, for
-example RTC001 (`Firma` missing), RTC007 (`Wareneingangsdatum` missing), RTC041
+The ERP answers every booking with HTTP 200 and a list of return codes: RTC000
+("keine fehler Aufgetreten.") on success, otherwise for example RTC001 (`Firma` missing), RTC007 (`Wareneingangsdatum` missing), RTC041
 (`Menge` invalid) or RTC100 (booking not accepted). Because the codes do not
 say what was booked, the API reads the order before and after and marks a
 position as `booked` only when the ERP did not answer RTC100 and the position's
-`Bereitszugebuchtemenge` increased by the booked quantity. The response
+`Bereitszugebuchtemenge` increased by the booked quantity. The ERP's JSON can
+contain trailing commas, which the API repairs before parsing. The response
 contains one result per position (`booked`, `bookedBefore`, `bookedAfter`,
 the ERP `return` codes, the invoice number), `allBooked`, and the order as
 read after booking; the card shows the results, updates the open positions

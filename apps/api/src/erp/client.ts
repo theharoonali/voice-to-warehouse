@@ -102,6 +102,27 @@ function describeError(error: unknown): string {
     .join(' ');
 }
 
+// The ERP sometimes answers with JSON that has trailing commas, which the
+// parser rejects. Repair that before giving up.
+function parseErpJson(text: string, what: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    try {
+      return JSON.parse(text.replace(/,\s*([\]}])/g, '$1'));
+    } catch {
+      console.error(
+        `ERP ${what} answered invalid JSON: ${describeError(error)} Body: ${text.slice(0, 300)}`,
+      );
+      throw new HttpError(
+        502,
+        'INTERNAL_ERROR',
+        `The ERP ${what} answered with invalid JSON.`,
+      );
+    }
+  }
+}
+
 async function callErp(
   method: 'POST' | 'PUT',
   path: string,
@@ -144,7 +165,7 @@ async function callErp(
           `The ERP ${what} failed with status ${response.status}.`,
         );
       }
-      return await response.json();
+      return parseErpJson(await response.text(), what);
     } catch (error) {
       if (error instanceof HttpError) throw error;
       if (abortSignal.aborted) {

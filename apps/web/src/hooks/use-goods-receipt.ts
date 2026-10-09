@@ -48,13 +48,17 @@ export function useGoodsReceipt({
   const [booking, setBooking] = useState<BookingState>({ status: 'idle' });
   const request = useRef<AbortController | null>(null);
   const bookingRequest = useRef<AbortController | null>(null);
+  const orderRequest = useRef<AbortController | null>(null);
   const created = useRef(onCreated);
   useEffect(() => {
     created.current = onCreated;
   });
 
-  useEffect(() => {
+  // Reads the open positions from the ERP, replacing any read in progress.
+  function loadOrder() {
+    orderRequest.current?.abort();
     const controller = new AbortController();
+    orderRequest.current = controller;
     fetchGoodsReceiptOrder(controller.signal)
       .then((data) => {
         if (!controller.signal.aborted)
@@ -71,15 +75,16 @@ export function useGoodsReceipt({
           });
         }
       });
-    return () => controller.abort();
-  }, []);
-  useEffect(
-    () => () => {
+  }
+
+  useEffect(() => {
+    loadOrder();
+    return () => {
+      orderRequest.current?.abort();
       request.current?.abort();
       bookingRequest.current?.abort();
-    },
-    [],
-  );
+    };
+  }, []);
 
   // Creates the receipt from the spoken words. A new recording replaces the
   // previous result.
@@ -125,6 +130,18 @@ export function useGoodsReceipt({
     request.current?.abort();
     request.current = null;
     setResult({ status: 'idle' });
+  }
+
+  // Forgets everything and reads the open positions again.
+  function reset() {
+    request.current?.abort();
+    request.current = null;
+    bookingRequest.current?.abort();
+    bookingRequest.current = null;
+    setResult({ status: 'idle' });
+    setBooking({ status: 'idle' });
+    setOrder({ status: 'loading' });
+    loadOrder();
   }
 
   // Sets the expiry date (MMYYYY) of one recognised article and of the
@@ -234,6 +251,7 @@ export function useGoodsReceipt({
     loading: result.status === 'loading',
     create,
     cancel,
+    reset,
     setExpiry,
     confirm,
     bookingsToConfirm,
