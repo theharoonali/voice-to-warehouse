@@ -152,7 +152,7 @@ export function ConfirmationPanel({
           {awaitingVoice && (
             <span className="voice-cue" role="status">
               <span className="rays" aria-hidden="true" />
-              {bookable ? 'Say “Done” to book' : 'Listening'}
+              {bookable ? 'Say “Done” to book or “Cancel”' : 'Listening'}
             </span>
           )}
           {bookable && (

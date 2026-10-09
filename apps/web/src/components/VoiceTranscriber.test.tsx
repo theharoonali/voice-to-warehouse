@@ -579,7 +579,7 @@ it('listens for the confirmation after a receipt and books it when the worker sa
   hook.status = 'listening';
   hook.segments = [];
   await rerenderApp(rerender);
-  expect(screen.getByText('Say “Done” to book')).toBeTruthy();
+  expect(screen.getByText('Say “Done” to book or “Cancel”')).toBeTruthy();
   expect(screen.getAllByRole('status')[0]?.textContent).toContain(
     'Listening for “Done”',
   );
@@ -604,26 +604,54 @@ it('listens for the confirmation after a receipt and books it when the worker sa
   ).toContain('fully booked');
 });
 
-it('replaces the receipt when the worker says new words instead of confirming', async () => {
+it('waits for done while a complete receipt is shown, ignoring other words', async () => {
   const { rerender } = await renderApp();
   await record(rerender, 'One pack of Ibuflam, bin M53-01-01-02, batch AB1234');
   expect(hook.start).toHaveBeenCalledTimes(1);
 
+  // Chatter without "Done" ends nothing and changes nothing.
+  hook.status = 'listening';
+  hook.segments = ['Let me check the label.'];
+  await rerenderApp(rerender);
+  expect(hook.stop).not.toHaveBeenCalled();
+
+  // Words before "Done" are ignored: the shown receipt is booked as it is.
+  hook.segments = ['Let me check the label.', 'Yes that is right, done.'];
+  await rerenderApp(rerender);
+  expect(hook.stop).toHaveBeenCalledTimes(1);
+  await stopRecording(rerender);
+  expect(fetchGoodsReceipt).toHaveBeenCalledTimes(1);
+  expect(fetchGoodsReceiptBooking).toHaveBeenCalledWith(
+    complete.bestellungen,
+    expect.any(AbortSignal),
+  );
+});
+
+it('replaces an incomplete receipt with the words said before done', async () => {
+  vi.mocked(fetchGoodsReceipt).mockResolvedValueOnce(incomplete);
+  const { rerender } = await renderApp();
+  await record(rerender, 'A pack of Ibuflam');
+  expect(screen.getByText('5 missing')).toBeTruthy();
+  expect(hook.start).toHaveBeenCalledTimes(1);
+
   hook.status = 'listening';
   hook.segments = [
-    'Two packs of Ibuflam, bin M53-01-01-02, batch AB1234',
+    'One pack of Ibuflam, bin M53-01-01-02, batch AB1234',
     'Done.',
   ];
   await rerenderApp(rerender);
   await stopRecording(rerender);
   expect(fetchGoodsReceiptBooking).not.toHaveBeenCalled();
   expect(fetchGoodsReceipt).toHaveBeenLastCalledWith(
-    'Two packs of Ibuflam, bin M53-01-01-02, batch AB1234',
+    'One pack of Ibuflam, bin M53-01-01-02, batch AB1234',
     order,
     expect.any(AbortSignal),
   );
-  // A new receipt asks for its own confirmation.
+  // The corrected receipt asks for its own confirmation.
   expect(hook.start).toHaveBeenCalledTimes(2);
+  expect(
+    screen.getByRole('table', { name: 'Goods receipt to book' }),
+  ).toBeTruthy();
 });
 
 it('discards the shown receipt when the worker says cancel while confirming', async () => {

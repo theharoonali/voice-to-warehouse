@@ -15,7 +15,9 @@ sentence to be finalized.
 Stopping by tap or Space also finishes it. As soon as the receipt is shown,
 the app listens again and the confirmation header shows turning rays with
 "Say Done to book": "Done" books the receipt in the ERP and refreshes the open
-positions, "Cancel" discards it, and saying the articles again replaces it.
+positions and "Cancel" discards it; other words are ignored until one of them
+is said. Only an incomplete receipt is replaced by the articles said before
+"Done".
 The EN/DE toggle in the header is disabled while recording. Voice is the only
 input; there is no text field.
 

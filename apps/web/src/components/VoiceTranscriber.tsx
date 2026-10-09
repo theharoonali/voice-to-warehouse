@@ -78,17 +78,15 @@ export function VoiceTranscriber() {
           setSheetOpen(false);
           return;
         }
-        if (words) {
-          setCancelled(false);
-          setMode('capture');
-          void receipt.create(words);
+        setCancelled(false);
+        setMode('capture');
+        // A complete receipt waits for "Done": other words are ignored until
+        // then. An incomplete one is replaced by the words said before "Done".
+        if (mode === 'confirm' && bookable) {
+          if (done) void receipt.confirm(receipt.bookingsToConfirm());
           return;
         }
-        if (mode === 'confirm') {
-          setMode('capture');
-          if (done && bookable)
-            void receipt.confirm(receipt.bookingsToConfirm());
-        }
+        if (words) void receipt.create(words);
       },
     };
   });
